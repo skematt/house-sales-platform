@@ -1,7 +1,13 @@
 import React from 'react';
 import {useState, useEffect, useRef} from "react";
 import {getAuth, onAuthStateChanged} from "firebase/auth";
-import {getStorage, ref, uploadBytesResumable, getDownloadURL} from "firebase/storage";
+import {
+    getStorage,
+    ref,
+    uploadBytesResumable,
+    getDownloadURL,
+} from 'firebase/storage'
+import {addDoc, collection, serverTimestamp} from "firebase/firestore";
 import {db} from "../firebase.config";
 import {useNavigate} from "react-router-dom";
 import {toast} from "react-toastify";
@@ -84,7 +90,9 @@ function CreateListing(props) {
                 const storage = getStorage();
                 const fileName = `${auth.currentUser.uid}-${image.name}-${uuidv4()}`
 
+                console.log('calling storage ref')
                 const storageRef = ref(storage, 'images/' + fileName);
+                console.log('finished calling storage ref')
 
                 const uploadTask = uploadBytesResumable(storageRef, image);
 
@@ -106,6 +114,7 @@ function CreateListing(props) {
                         }
                     },
                     (error) => {
+                        console.log(error)
                         reject(error)
                     },
                     () => {
@@ -121,15 +130,30 @@ function CreateListing(props) {
 
         const imgUrls = await Promise.all(
             [...images].map((image) => storeImage(image))
-        ).catch(() => {
+        ).catch((error) => {
             setLoading(false)
-            toast.error('Error uploading images')
+            console.log(error)
+            toast.error('Images not uploaded')
             return
         })
 
+        const formDataCopy = {
+            ...formData,
+            imgUrls,
+            geolocation,
+            timestamp: serverTimestamp()
+        }
         console.log(imgUrls)
+        delete formDataCopy.images
+        delete formDataCopy.address
+        location && (formDataCopy.location = location)
+        !formDataCopy.offer && delete formDataCopy.discountedPrice
 
+        const docRef = await addDoc(collection(db, 'listings'), formDataCopy)
         setLoading(false)
+
+        toast.success('Listing saved')
+        navigate(`/category/${formDataCopy.type}/${docRef.id}`)
 
     }
 
@@ -145,7 +169,7 @@ function CreateListing(props) {
         if (e.target.files) {
             setFormData((prevState) => ({
                 ...prevState,
-                images: e.target.files
+                images: e.target.files,
             }))
         }
 

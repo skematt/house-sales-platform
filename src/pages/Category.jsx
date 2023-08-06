@@ -48,6 +48,7 @@ function Category(props) {
             }
         }
         fetchListings();
+
     }, [params.categoryName]);
 
 
