@@ -11,6 +11,7 @@ function Category(props) {
 
     const [listings, setListings] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [lastFetchedListing, setLastFetchedListing] = useState(null)
 
     const params = useParams()
 
@@ -29,6 +30,9 @@ function Category(props) {
 
                 // Execute Query
                 const querySnapshot = await getDocs(q);
+
+                const lastVisible = querySnapshot.docs[querySnapshot.docs.length-1]
+                setLastFetchedListing(lastVisible)
 
                 let listings = []
 
@@ -50,6 +54,43 @@ function Category(props) {
         fetchListings();
 
     }, [params.categoryName]);
+
+    const onFetchMoreListings = async () => {
+        try {
+            // Create Ref
+            const listingsRef = collection(db, 'listings');
+
+            // Create Query
+            const q = query(listingsRef,
+                where('type', '==', params.categoryName),
+                orderBy('timestamp', 'desc'),
+                startAfter(lastFetchedListing),
+                limit(10)
+            )
+
+            // Execute Query
+            const querySnapshot = await getDocs(q);
+
+            const lastVisible = querySnapshot.docs[querySnapshot.docs.length-1]
+            setLastFetchedListing(lastVisible)
+
+            let listings = []
+
+            querySnapshot.forEach((doc) => {
+                listings.push({
+                    id: doc.id,
+                    data: doc.data()
+                })
+            })
+
+            setListings((prevState) => [...prevState, ...listings])
+            setLoading(false);
+
+        } catch (error) {
+            // console.log(error)
+            toast('Error fetching More listings')
+        }
+    }
 
 
     return (
@@ -74,6 +115,12 @@ function Category(props) {
                                     ))}
                                 </ul>
                             </main>
+
+                            <br />
+                            <br />
+                            {lastFetchedListing && (
+                                <p className="loadMore" onClick={onFetchMoreListings}>Load More</p>
+                            )}
                         </>
                     ) :
                     (
